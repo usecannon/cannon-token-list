@@ -1,0 +1,8 @@
+node_modules
+src/cannondir/version
+src/cannondir/settings.json
+src/cannondir/blobs/*
+src/cannondir/tags/*
+src/cannondir/ipfs_cache/*
+src/deploys/*
+src/tokenlists/*

@@ -1,0 +1,27 @@
+{
+  "name": "cannon-token-list",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "generate-multichain-list": "ts-node src/generate-multichain-token-json.ts",
+    "generate-deploy-info": "ts-node src/generate-build-data.ts",
+    "publish-packages": "ts-node src/publish-packages.ts"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@types/node": "^20.12.7",
+    "@uniswap/default-token-list": "github:uniswap/default-token-list",
+    "@uniswap/token-list-bridge-utils": "^2.3.0",
+    "@uniswap/token-lists": "^1.0.0-beta.34",
+    "@usecannon/builder": "file:../../cannon/packages/builder",
+    "axios": "^1.6.8",
+    "node-fetch": "^3.3.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.5",
+    "viem": "^2.9.29",
+    "zod": "^3.23.5"
+  }
+}
