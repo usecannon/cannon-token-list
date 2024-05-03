@@ -43,7 +43,7 @@
       "deploy.Token": {
         "artifacts": {
           "contracts": {
-            "MintableToken": {
+            "Token": {
               "address": "0x429069B559753E2949745b31fCb34519650455Fc",
               "abi": [
                 {

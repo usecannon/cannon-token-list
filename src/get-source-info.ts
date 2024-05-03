@@ -5,7 +5,7 @@ import { createClient } from './client'
 import { Address, Hex } from 'viem';
 import path from 'path';
 
-type SupportedChain = '1' | '10' | '42161' | '56' | '8543' | '43114' | '8543';
+type SupportedChain = '1' | '10' | '42161' | '56' | '8543' | '43114';
 
 function isValidJSON(jsonString: string): boolean {
 	try {

@@ -6,12 +6,13 @@ import { TokenInfo } from "@uniswap/token-lists";
 export const CANNON_DIRECTORY='./src/cannondir/';
 
 export async function generateLocalBuilds(deployInfo: DeploymentInfo, tokenInfo: TokenInfo, sourceInfo: any) {
+  const tokenName = tokenInfo.name.split(' ').join('');
   const cannonClient = createCannonClient();
   const cleanSnapshot = await cannonClient.snapshot();
 
-  console.log(`=================== GENERATING CANNON NETWORK BUILD =======================`)
+	console.log(`=================== GENERATING BUILD FOR ${tokenInfo.name} AT CHAIN ID 13370 =======================`);
 
-  const contractArtifact: ContractArtifact = sourceInfo.artifacts[tokenInfo.name];
+  const contractArtifact: ContractArtifact = sourceInfo.artifacts[tokenName];
 
   deployInfo.chainId = 13370
   
