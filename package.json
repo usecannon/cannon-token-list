@@ -6,7 +6,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "generate-multichain-list": "ts-node src/generate-multichain-token-json.ts",
-    "generate-deploy-info": "ts-node src/generate-build-data.ts",
+    "generate-builds": "ts-node src/generate-build-data.ts",
     "publish-packages": "ts-node src/publish-packages.ts"
   },
   "author": "",

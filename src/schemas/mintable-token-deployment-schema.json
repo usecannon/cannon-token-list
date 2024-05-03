@@ -4,7 +4,7 @@
     "def": {
       "name": "mintable-token",
       "version": "1.8",
-      "description": "Token",
+      "description": "MintableToken",
       "preset": "main",
       "setting": {
         "owner": {},
@@ -12,7 +12,7 @@
           "defaultValue": ""
         },
         "name": {
-          "defaultValue": "Token"
+          "defaultValue": "MintableToken"
         },
         "symbol": {
           "defaultValue": "TKN"
@@ -24,8 +24,8 @@
           "defaultValue": "0"
         }
       },
-      "contract": {
-        "MintableToken": {
+      "deploy": {
+        "Token": {
           "artifact": "MintableToken",
           "salt": "<%= settings.salt %>",
           "args": [
@@ -35,13 +35,12 @@
             "<%= settings.decimals %>",
             "<%= settings.initialSupply %>"
           ],
-          "create2": true,
           "highlight": true
         }
       }
     },
     "state": {
-      "contract.MintableToken": {
+      "deploy.Token": {
         "artifacts": {
           "contracts": {
             "MintableToken": {
@@ -435,7 +434,7 @@
                 "solcVersion": "string",
                 "input": ""
               },
-              "deployedOn": "contract.MintableToken",
+              "deployedOn": "deploy.Token",
               "highlight": true,
               "gasUsed": 774713,
               "gasCost": "1000000000"
