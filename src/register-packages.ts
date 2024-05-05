@@ -1,9 +1,8 @@
 import { CannonStorage, IPFSLoader, OnChainRegistry, getCannonContract } from "@usecannon/builder";
-import { Address, Abi, zeroAddress, stringToHex, encodeFunctionData, multicall3Abi, SimulateContractParameters, AccountStateConflictError } from "viem";
+import { Address, Abi, zeroAddress, stringToHex, encodeFunctionData} from "viem";
 import { createClient, createWallet } from "./client";
 import fs from "fs/promises";
 import { privateKeyToAccount } from 'viem/accounts';
-import { readIpfs } from "@usecannon/builder/dist/ipfs";
 
 
 const MULTICALL_ADDRESS = '0xE2C5658cC5C448B48141168f3e475dF8f65A1e3e';
@@ -16,7 +15,7 @@ export interface TxData {
   args?: any[];
 }
 
-export async function publishPackages(signerAddress: Address, chainId: Number) {
+export async function registerPackages(packageOwner: Address) {
   // Read the contents of the file
   const packages = await fs.readFile('./src/cannondir/packages', 'utf-8');
   // Split the data into an array of strings using newline characters as separators
@@ -35,19 +34,29 @@ export async function publishPackages(signerAddress: Address, chainId: Number) {
   // const multicall = await getCannonContract({package: 'trusted-multicall-forwarder', chainId: 1, contractName: 'TrustedMulticallForwarder'});
 
   let txs: TxData[] = [];
-  const owner = signerAddress;
+  const registerFee = await Mainnetclient.readContract({ ...registry, functionName: 'registerFee' });
 
   for (let pkg of packageNames) {
-    const packageHash = stringToHex(pkg, { size: 32 });
-    const ipfsHash = await fs.readFile(`./src/cannondir/tags/${pkg}_1_${chainId}-main.txt`);
-    const deployInfo = await readIpfs(process.env.IPFS_URL!, ipfsHash.toString(), {}, false, 300000);
+    const currentPackageOwner = await Mainnetclient.readContract({ ...registry, functionName: 'getPackageOwner', args: [stringToHex(pkg, { size: 32 })] });
 
+    // if (currentPackageOwner != zeroAddress) {
+    //   continue;
+    // }
+
+    const packageHash = stringToHex(pkg, { size: 32 });
     // txs.push({
     //   ...registry,
     //   functionName: 'setPackageOwnership',
     //   value: registerFee as string,
-    //   args: [packageHash, owner],
+    //   args: [packageHash, packageOwner],
     // });
+
+    txs.push({
+      ...registry,
+      functionName: 'setAdditionalPublishers',
+      value: registerFee as string,
+      args: [packageHash, [], [packageOwner]],
+    })
   }
 
   const value = txs.reduce((val, txn) => {
@@ -70,33 +79,40 @@ export async function publishPackages(signerAddress: Address, chainId: Number) {
     ],
   };
 
+  const account = privateKeyToAccount(process.env.PRIVATE_KEY! as Address);
+
   const simulatedGas = await Mainnetclient.estimateContractGas({
     ...txData,
-    account: signerAddress as Address
+    account: packageOwner as Address
   } as any);
+
+  console.log(simulatedGas)
 
   const params = {
     ...txData,
-    account: signerAddress as Address,
+    account: packageOwner as Address,
   };
+
 
   console.log("SIMULATING CONTRACT")
   const tx = await Mainnetclient.simulateContract(params as any);
 
+  console.log(tx);
   
+  // (tx as any).gas = ((simulatedGas) * BigInt(2));
   (tx as any).gas = (simulatedGas * BigInt(12)) / BigInt(9);
+  console.log((tx as any).gas)
+    
+  // const signer = await createWallet(Mainnetclient)
+  // tx.request.account = account; 
+  // console.log("Writing to contract")
+  // const hash = await signer.writeContract(tx.request as any);
+  // console.log("TX has been written")
   
-  const account = privateKeyToAccount(process.env.PRIVATE_KEY! as Address);
-  
-  const signer = await createWallet(OPclient)
-  tx.request.account = account; 
-  console.log("Writing to contract")
-  const hash = await signer.writeContract(tx.request as any);
-  console.log("TX has been written")
+  // const receipt = await Mainnetclient.waitForTransactionReceipt({ hash });
+  // console.log("TX has been waited for")
 
-  const receipt = await Mainnetclient.waitForTransactionReceipt({ hash });
-
-  console.log(receipt);
+  // console.log(receipt);
 }
 
-publishPackages('0xca7777aB932E8F0b930dE9F0d96f4E9a2a00DdD3', 1);
+registerPackages('0xca7777aB932E8F0b930dE9F0d96f4E9a2a00DdD3');

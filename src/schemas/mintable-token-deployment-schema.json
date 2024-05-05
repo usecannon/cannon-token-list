@@ -3,14 +3,11 @@
     "timestamp": 0,
     "def": {
       "name": "mintable-token",
-      "version": "1.8",
+      "version": "1",
       "description": "MintableToken",
       "preset": "main",
       "setting": {
         "owner": {},
-        "salt": {
-          "defaultValue": ""
-        },
         "name": {
           "defaultValue": "MintableToken"
         },
@@ -27,7 +24,6 @@
       "deploy": {
         "Token": {
           "artifact": "MintableToken",
-          "salt": "<%= settings.salt %>",
           "args": [
             "<%= settings.owner %>",
             "<%= settings.name %>",

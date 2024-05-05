@@ -1,13 +1,14 @@
-import { ChainArtifacts, ChainBuilderRuntime, ChainDefinition, ContractArtifact, DeploymentInfo, IPFSLoader, build, createInitialContext } from "@usecannon/builder";
+import { ContractArtifact, DeploymentInfo } from "@usecannon/builder";
 import fs from 'fs/promises'
 import * as fss from 'fs'
 import { TokenInfo, TokenList } from "@uniswap/token-lists";
 import { deploySchema } from "@usecannon/builder/dist/schemas";
-import { Abi, AbiItem, Address, Hex } from "viem";
+import { Abi, Address, Hex } from "viem";
 import { writeIpfs } from "@usecannon/builder/dist/ipfs";
 import path from "path";
 import { getSourceCode } from "./get-source-info";
 import { generateLocalBuilds } from "./generate-local-build-data";
+import { registerPackages } from "./register-packages";
 
 export type BridgeInfo = {
 	[destinationChainId: string]: {
@@ -17,6 +18,8 @@ export type BridgeInfo = {
 
 const dir = path.basename(path.dirname(__dirname));
 const srcDir = (dir === 'src' ? '.' : 'src');
+
+const builtPackages: string[] = [];
 
 async function getContractSourceInfo(deployInfo: DeploymentInfo, chainId: number, name: string, address: Address) {
 	console.log(`=================== GETTING CONTRACT SOURCE CODE =======================`)
@@ -61,8 +64,12 @@ async function createDeployInfo(tokenInfo: TokenInfo, chainId: number, address: 
 		.replace('TKN', tokenInfo.symbol)
 		.replace(/0x429069B559753E2949745b31fCb34519650455Fc/g, address)
 	transformedSchema = transformedSchema
-		.replace(/mintable-token/g, tokenName.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase())
+		.replace(/mintable-token/g, `${tokenInfo.symbol.toLowerCase()}-token`)
 	let deployInfo: DeploymentInfo = JSON.parse(transformedSchema);
+
+	deployInfo.generator = 'cannon token generator';
+	// deployInfo.version = '1.0.0';
+	deployInfo.timestamp = Math.floor(Date.now() / 1000);
 
 	// Transform source code info JSON
 	let sourceSchemaString = JSON.stringify(sourceSchema);
@@ -81,7 +88,7 @@ async function createDeployInfo(tokenInfo: TokenInfo, chainId: number, address: 
 		return [null, null];
 	}
 
-	deployInfo.chainId = chainId
+	deployInfo.chainId = chainId;
 
 	return [deployInfo as DeploymentInfo, sourceCodeInfo];
 }
@@ -94,8 +101,8 @@ async function publishToIpfs(deployInfo: DeploymentInfo, sourceInfo: ContractArt
 
 	deployInfo.miscUrl = `ipfs://${miscIpfsHash}`;
 
-	const deployTag = `${symbol.toLowerCase()}-token_1.0.0_${chainId}-main.txt`
-	const metaTag = `${symbol.toLowerCase()}-token_1.0.0_${chainId}-main.meta.txt`
+	const deployTag = `${symbol.toLowerCase()}-token_1_${chainId}-main.txt`
+	const metaTag = `${symbol.toLowerCase()}-token_1_${chainId}-main.meta.txt`
 
 	await fs.writeFile(`${srcDir}/cannondir/tags/${deployTag}`, `ipfs://${deployIpfsHash}`, 'utf-8')
 	await fs.writeFile(`${srcDir}/cannondir/tags/${metaTag}`, 'ipfs://QmNg2R3moWLsMLAVKYYzzoHUHjjmXBDnYqphvSCBSBXWsm', 'utf-8')
@@ -118,25 +125,45 @@ export async function generateBuilds() {
 
 		const [tempAbi, tempSource] = [sourceCodeInfo.artifacts[tokenName].abi, sourceCodeInfo.artifacts[tokenName].source]
 
+		// If ABI is not from a proxy, we swap it out. Otherwise we keep the mintable token ABI
 		if (sourceInfo.abi && (sourceInfo.abi as any).find((f: any) => f.name === 'balanceOf')) {
 			sourceCodeInfo.artifacts[tokenName].abi = sourceInfo.abi;
 			sourceCodeInfo.artifacts[tokenName].source = sourceInfo.source;
+			sourceCodeInfo.artifacts[tokenName].bytecode = sourceInfo.bytecode;
+			sourceCodeInfo.artifacts[tokenName].sourceName = sourceInfo.sourceName;
+			sourceCodeInfo.artifacts[tokenName].contractName = sourceInfo.contractName;
 
 			// If we are able to retrieve the source info from etherscan, we replace the default ERC20 one with it.
 			deployInfo.state[`deploy.Token`].artifacts.contracts!['Token'].abi = sourceInfo.abi
 		} else {
-			console.log("Source ABI is a proxy ABI, keeping basic ERC20 ABI")
+			console.log("Keeping default ERC20 ABI....")
 		}
 
 		await publishToIpfs(deployInfo, sourceCodeInfo, tokenInfo.symbol, tokenInfo.chainId);
 
+		builtPackages.push(`${tokenInfo.symbol.toLowerCase()}-token`);
 
-		// Do local build
-		if (await fss.existsSync(`${tokenInfo.symbol.toLowerCase()}-token_1.0.0_13370-main.txt`)) {
-			console.log("Skipping cannon build")
+		// Do local build if it hasnt been done already
+		if (fss.existsSync(`${srcDir}/cannondir/tags/${tokenInfo.symbol.toLowerCase()}-token_1_13370-main.txt`)) {
+			console.log("Skipping cannon build.....")
 		} else {
-			sourceCodeInfo.artifacts[tokenName].abi = tempAbi;
-			sourceCodeInfo.artifacts[tokenName].source = tempSource;
+			// Function to check if constructor has no args
+			function constructorIsEmpty(abi: any) {
+				const constructor = abi.find((entry: any) => entry.type === 'constructor');
+				if (!constructor) {
+					return true;
+				}
+
+				return (constructor.inputs && constructor.inputs.length === 0);
+			}
+
+			if (sourceCodeInfo.artifacts[tokenName].abi && constructorIsEmpty(sourceCodeInfo.artifacts[tokenName].abi)) {
+				delete deployInfo.def['deploy']['Token'].args;
+				delete deployInfo.def.setting;
+			} else {
+				sourceCodeInfo.artifacts[tokenName].abi = tempAbi;
+				sourceCodeInfo.artifacts[tokenName].source = tempSource;
+			}
 
 			const cannonDeployInfo = await generateLocalBuilds(deployInfo, tokenInfo, sourceCodeInfo);
 
@@ -177,7 +204,14 @@ export async function generateBuilds() {
 		// }
 	}
 
+	// Create a Set from the array to remove duplicates
+	const unique = new Set(builtPackages);
+	// Convert the Set back to an array
+	const dedupedPkgs = Array.from(unique);
 
+	const packagesToRegister: string = dedupedPkgs.join('\n');
+
+	await fs.writeFile(`${srcDir}/cannondir/packages`, packagesToRegister, 'utf-8');
 }
 
-generateBuilds()
+generateBuilds();

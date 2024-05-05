@@ -1,6 +1,6 @@
 import { ChainBuilderRuntime, ChainBuilderRuntimeInfo, ChainDefinition, ContractArtifact, DeploymentInfo, DeploymentState, IPFSLoader, OnChainRegistry, build, createInitialContext } from "@usecannon/builder";
 import { createCannonClient } from './client'
-import { PublicClient, WalletClient, TestClient, Address, Hex} from 'viem';
+import { PublicClient, WalletClient, Address} from 'viem';
 import { TokenInfo } from "@uniswap/token-lists";
 
 export const CANNON_DIRECTORY='./src/cannondir/';
@@ -15,6 +15,7 @@ export async function generateLocalBuilds(deployInfo: DeploymentInfo, tokenInfo:
   const contractArtifact: ContractArtifact = sourceInfo.artifacts[tokenName];
 
   deployInfo.chainId = 13370
+  deployInfo.state = {};
   
   const info = {
     provider: cannonClient as PublicClient,
@@ -49,7 +50,7 @@ export async function generateLocalBuilds(deployInfo: DeploymentInfo, tokenInfo:
 
   const initialCtx = await createInitialContext(chainDefinition, {}, deployInfo.chainId!, deployInfo.options);
 
-	const buildResult = await build(runtime, chainDefinition, {}, initialCtx);
+	const buildResult = await build(runtime, chainDefinition, deployInfo.state, initialCtx);
 
   if (cleanSnapshot) {
     await cannonClient.revert({ id: cleanSnapshot });
