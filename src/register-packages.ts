@@ -1,5 +1,5 @@
 import { CannonStorage, IPFSLoader, OnChainRegistry, getCannonContract } from "@usecannon/builder";
-import { Address, Abi, zeroAddress, stringToHex, encodeFunctionData} from "viem";
+import { Address, Abi, zeroAddress, stringToHex, encodeFunctionData, decodeFunctionData} from "viem";
 import { createClient, createWallet } from "./client";
 import fs from "fs/promises";
 import { privateKeyToAccount } from 'viem/accounts';
@@ -21,6 +21,8 @@ export async function registerPackages(packageOwner: Address) {
   // Split the data into an array of strings using newline characters as separators
   const packageNames: string[] = packages.split('\n').map(str => str.trim());
 
+  console.log(packageNames)
+
   const OPclient = createClient(10, process.env.OP_URL!);
   const Mainnetclient = createClient(1, process.env.MAINNET_URL!);
   const registry = await getCannonContract({
@@ -35,15 +37,16 @@ export async function registerPackages(packageOwner: Address) {
 
   let txs: TxData[] = [];
   const registerFee = await Mainnetclient.readContract({ ...registry, functionName: 'registerFee' });
+  const multicallAbi = JSON.parse(await fs.readFile(`./src/multicall.json`, 'utf8'));
 
-  for (let pkg of packageNames) {
-    const currentPackageOwner = await Mainnetclient.readContract({ ...registry, functionName: 'getPackageOwner', args: [stringToHex(pkg, { size: 32 })] });
-
-    // if (currentPackageOwner != zeroAddress) {
-    //   continue;
+  packageNames.forEach((pkg) => {
+    const packageHash = stringToHex(pkg, { size: 32 });
+    // if (currentPackageOwner = zeroAddress) {
+    //   return;
     // }
 
-    const packageHash = stringToHex(pkg, { size: 32 });
+    console.log("CREATING TRANSACTIONS", pkg)
+
     // txs.push({
     //   ...registry,
     //   functionName: 'setPackageOwnership',
@@ -57,25 +60,29 @@ export async function registerPackages(packageOwner: Address) {
       value: registerFee as string,
       args: [packageHash, [], [packageOwner]],
     })
-  }
+  })
+
+  console.log(txs)
 
   const value = txs.reduce((val, txn) => {
     return val + (BigInt(txn.value || 0) || BigInt(0));
   }, BigInt(0));
 
 
+  const txArgs = txs.map((txn) => ({
+    target: txn.address || zeroAddress,
+    callData: encodeFunctionData(txn as any),
+    value: txn.value || '0',
+    requireSuccess: true,
+  }));
+
   const txData = {
-    abi: JSON.parse(await fs.readFile(`./src/multicall.json`, 'utf8')),
+    abi: multicallAbi,
     address: MULTICALL_ADDRESS,
     functionName: 'aggregate3Value',
     value,
     args: [
-      txs.map((txn) => ({
-        target: txn.address || zeroAddress,
-        callData: encodeFunctionData(txn as any),
-        value: txn.value || '0',
-        requireSuccess: true,
-      })),
+      txArgs
     ],
   };
 
@@ -83,36 +90,29 @@ export async function registerPackages(packageOwner: Address) {
 
   const simulatedGas = await Mainnetclient.estimateContractGas({
     ...txData,
-    account: packageOwner as Address
+    account: account
   } as any);
-
-  console.log(simulatedGas)
 
   const params = {
     ...txData,
-    account: packageOwner as Address,
+    account: account,
   };
-
-
+  
   console.log("SIMULATING CONTRACT")
   const tx = await Mainnetclient.simulateContract(params as any);
 
   console.log(tx);
+      
+  const signer = await createWallet(Mainnetclient)
+  tx.request.account = account; 
+  console.log("Writing to contract")
+  const hash = await signer.writeContract(tx.request as any);
+  console.log("TX has been written")
   
-  // (tx as any).gas = ((simulatedGas) * BigInt(2));
-  (tx as any).gas = (simulatedGas * BigInt(12)) / BigInt(9);
-  console.log((tx as any).gas)
-    
-  // const signer = await createWallet(Mainnetclient)
-  // tx.request.account = account; 
-  // console.log("Writing to contract")
-  // const hash = await signer.writeContract(tx.request as any);
-  // console.log("TX has been written")
-  
-  // const receipt = await Mainnetclient.waitForTransactionReceipt({ hash });
-  // console.log("TX has been waited for")
+  const receipt = await Mainnetclient.waitForTransactionReceipt({ hash });
+  console.log("TX has been waited for")
 
-  // console.log(receipt);
+  console.log(receipt);
 }
 
 registerPackages('0xca7777aB932E8F0b930dE9F0d96f4E9a2a00DdD3');

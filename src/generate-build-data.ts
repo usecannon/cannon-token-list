@@ -47,7 +47,7 @@ async function createDeployInfo(tokenInfo: TokenInfo, chainId: number, address: 
 	const tokenName = tokenInfo.name.split(' ').join('');
 
 	if (tokenName.length > 31 || tokenName.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase().length > 31) {
-		console.log('Name too long, skipping....')
+		console.log('Package Name too long, skipping....')
 		return [null, null];
 	}
 
@@ -100,10 +100,13 @@ async function publishToIpfs(deployInfo: DeploymentInfo, sourceInfo: ContractArt
 
 	deployInfo.miscUrl = `ipfs://${miscIpfsHash}`;
 
-	const deployTag = `${symbol.toLowerCase()}-token_1_${chainId}-main.txt`
-	const metaTag = `${symbol.toLowerCase()}-token_1_${chainId}-main.meta.txt`
+	const deployTag = `${symbol.toLowerCase()}-token_1.0.0_${chainId}-main.txt`
+	const metaTag = `${symbol.toLowerCase()}-token_1.0.0_${chainId}-main.meta.txt`
 
-	await fs.writeFile(`${srcDir}/cannondir/tags/${deployTag}`, `ipfs://${deployIpfsHash}`, 'utf-8')
+	// Write deployment hash
+	await fs.writeFile(`${srcDir}/cannondir/tags/${deployTag}`, `ipfs://${deployIpfsHash}`, 'utf-8');
+
+	// Write metadata hash
 	await fs.writeFile(`${srcDir}/cannondir/tags/${metaTag}`, 'ipfs://QmNg2R3moWLsMLAVKYYzzoHUHjjmXBDnYqphvSCBSBXWsm', 'utf-8')
 }
 
@@ -168,46 +171,10 @@ export async function generateBuilds() {
 
 			await publishToIpfs(cannonDeployInfo, sourceCodeInfo, tokenInfo.symbol, 13370)
 		}
-
-		// const extensions = tokenInfo.extensions!;
-		// for (let extension in extensions) {
-		// 	console.log("EXTENSION ======>", extensions[`${extension}`])
-		// 	for (let chainId in extensions[`${extension}`] as BridgeInfo) {
-		// 		if (Object.prototype.hasOwnProperty.call(extensions[`${extension}`], chainId)) {
-		// 			const tokenAddress = Object.values(Object.values(extensions)[0]![chainId as keyof typeof extensions[`${typeof extension}`]])
-		// 			const address = tokenAddress[0] as string;
-
-		// 			const [deployInfo] = await createDeployInfo(tokenInfo, parseInt(chainId), address as Address);
-
-		// 			// console.log("CHAIN ID ===>", deployInfo.chainId)
-		// 			// console.log("DEPLOY ARTIFACTS ====>", deployInfo.state['deploy.Token'].artifacts)
-		// 			// console.log(extensions[`${extension}`])
-
-
-		// 			if (!deployInfo) {
-		// 				continue;
-		// 			}
-
-		// 			const sourceInfo = await getContractSourceInfo(deployInfo, parseInt(chainId), tokenName, address as Address);
-
-		// 			// If we are able to retrieve the source info from etherscan, we replace the default ERC20 one with it.
-		// 			const contractArtifact = deployInfo.state[`deploy.Token`].artifacts.contracts!['Token'];
-		// 			deployInfo.state[`deploy.Token`].artifacts.contracts!['Token'] = { ...contractArtifact, ...sourceInfo }
-
-		// 			await publishToIpfs(deployInfo, sourceInfo, tokenInfo.symbol, parseInt(chainId));
-		// 		} else {
-		// 			console.log("=======================================>>>>>>>>>")
-		// 			console.log("THIS IS THE ELSE", extensions[`${extension}`])
-		// 		}
-		// 	}
-		// }
 	}
 
-	// Create a Set from the array to remove duplicates
 	const unique = new Set(builtPackages);
-	// Convert the Set back to an array
 	const dedupedPkgs = Array.from(unique);
-
 	const packagesToRegister: string = dedupedPkgs.join('\n');
 
 	await fs.writeFile(`${srcDir}/cannondir/packages`, packagesToRegister, 'utf-8');

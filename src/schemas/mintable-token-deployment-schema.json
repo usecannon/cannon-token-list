@@ -3,7 +3,7 @@
     "timestamp": 0,
     "def": {
       "name": "mintable-token",
-      "version": "1",
+      "version": "1.0.0",
       "description": "MintableToken",
       "preset": "main",
       "setting": {

@@ -3,7 +3,6 @@ import { Address, Abi, zeroAddress, stringToHex, encodeFunctionData, multicall3A
 import { createClient, createWallet } from "./client";
 import fs from "fs/promises";
 import { privateKeyToAccount } from 'viem/accounts';
-import { readIpfs } from "@usecannon/builder/dist/src/ipfs";
 
 
 const MULTICALL_ADDRESS = '0xE2C5658cC5C448B48141168f3e475dF8f65A1e3e';
@@ -16,87 +15,91 @@ export interface TxData {
   args?: any[];
 }
 
-export async function publishPackages(signerAddress: Address, chainId: Number) {
+export async function publishPackages(chainId: Number) {
   // Read the contents of the file
   const packages = await fs.readFile('./src/cannondir/packages', 'utf-8');
   // Split the data into an array of strings using newline characters as separators
   const packageNames: string[] = packages.split('\n').map(str => str.trim());
 
-  const OPclient = createClient(10, process.env.OP_URL!);
-  const Mainnetclient = createClient(1, process.env.MAINNET_URL!);
+  console.log(packageNames)
+
+  const OPClient = createClient(10, process.env.OP_URL!);
   const registry = await getCannonContract({
     package: 'registry:2.13.1@main',
     chainId: 1,
     contractName: 'Proxy',
     storage: new CannonStorage(
-      new OnChainRegistry({ address: '0x8E5C7EFC9636A6A0408A46BB7F617094B81e5dba', provider: OPclient }),
+      new OnChainRegistry({ address: '0x8E5C7EFC9636A6A0408A46BB7F617094B81e5dba', provider: OPClient }),
       { ipfs: new IPFSLoader(process.env.IPFS_URL!, {}, 30000, 3) })
   });
-  // const multicall = await getCannonContract({package: 'trusted-multicall-forwarder', chainId: 1, contractName: 'TrustedMulticallForwarder'});
 
   let txs: TxData[] = [];
-  const owner = signerAddress;
+  const multicallAbi = JSON.parse(await fs.readFile(`./src/multicall.json`, 'utf8'));
 
   for (let pkg of packageNames) {
     const packageHash = stringToHex(pkg, { size: 32 });
-    const ipfsHash = await fs.readFile(`./src/cannondir/tags/${pkg}_1_${chainId}-main.txt`);
-    const deployInfo = await readIpfs(process.env.IPFS_URL!, ipfsHash.toString(), {}, false, 300000);
+    const variant = stringToHex(`${chainId}-main`, { size: 32 });
+    const ipfsHash = (await fs.readFile(`./src/cannondir/tags/${pkg}_1.0.0_${chainId}-main.txt`)).toString();
+    const ipfsMetaHash = (await fs.readFile(`./src/cannondir/tags/${pkg}_1.0.0_${chainId}-main.meta.txt`)).toString();
 
-    // txs.push({
-    //   ...registry,
-    //   functionName: 'setPackageOwnership',
-    //   value: registerFee as string,
-    //   args: [packageHash, owner],
-    // });
+    txs.push({
+      ...registry,
+      functionName: 'publish',
+      value: BigInt(0),
+      args: [
+        packageHash,
+        variant,
+        ['1', 'latest'].map((t) => stringToHex(t, { size: 32 })),
+        ipfsHash,
+        ipfsMetaHash || '',
+      ],
+    });
   }
+  console.log(txs)
 
   const value = txs.reduce((val, txn) => {
     return val + (BigInt(txn.value || 0) || BigInt(0));
   }, BigInt(0));
 
 
+  const txArgs = txs.map((txn) => ({
+    target: txn.address || zeroAddress,
+    callData: encodeFunctionData(txn as any),
+    value: txn.value || '0',
+    requireSuccess: true,
+  }));
+
   const txData = {
-    abi: JSON.parse(await fs.readFile(`./src/multicall.json`, 'utf8')),
+    abi: multicallAbi,
     address: MULTICALL_ADDRESS,
     functionName: 'aggregate3Value',
     value,
     args: [
-      txs.map((txn) => ({
-        target: txn.address || zeroAddress,
-        callData: encodeFunctionData(txn as any),
-        value: txn.value || '0',
-        requireSuccess: true,
-      })),
+      txArgs
     ],
   };
 
-  const simulatedGas = await Mainnetclient.estimateContractGas({
-    ...txData,
-    account: signerAddress as Address
-  } as any);
+  const account = privateKeyToAccount(process.env.PRIVATE_KEY! as Address);
 
   const params = {
     ...txData,
-    account: signerAddress as Address,
+    account: account,
   };
 
   console.log("SIMULATING CONTRACT")
-  const tx = await Mainnetclient.simulateContract(params as any);
+  const tx = await OPClient.simulateContract(params as any);
 
-  
-  (tx as any).gas = (simulatedGas * BigInt(12)) / BigInt(9);
-  
-  const account = privateKeyToAccount(process.env.PRIVATE_KEY! as Address);
-  
-  const signer = await createWallet(OPclient)
+  const signer = await createWallet(OPClient)
   tx.request.account = account; 
   console.log("Writing to contract")
   const hash = await signer.writeContract(tx.request as any);
   console.log("TX has been written")
 
-  const receipt = await Mainnetclient.waitForTransactionReceipt({ hash });
+  const receipt = await OPClient.waitForTransactionReceipt({ hash });
+  console.log("TX has been waited for")
 
   console.log(receipt);
 }
 
-publishPackages('0xca7777aB932E8F0b930dE9F0d96f4E9a2a00DdD3', 1);
+publishPackages(1);
+publishPackages(13370);
