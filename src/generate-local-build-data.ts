@@ -21,9 +21,6 @@ export async function generateLocalBuilds(deployInfo: DeploymentInfo, tokenInfo:
     provider: cannonClient as PublicClient,
     chainId: deployInfo.chainId,
     async getSigner(addr: Address) {
-      // on test network any user can be conjured
-      //await provider.impersonateAccount({ address: addr });
-      //await provider.setBalance({ address: addr, value: viem.parseEther('10000') });
       return { address: '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266', wallet: cannonClient as WalletClient };
     },
     async getArtifact(name: string) {

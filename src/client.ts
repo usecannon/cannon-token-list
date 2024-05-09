@@ -25,10 +25,10 @@ export function getChainById(id: number): Chain {
 	return chain;
 }
 
-export function createClient(chainId: number | string, providerUrl: string) {
+export function createClient(chainId: number | string, providerUrl?: string) {
 	return createPublicClient({
 		chain: getChainById(parseInt(chainId.toString())),
-		transport: http(providerUrl || 'http://localhost:8545')
+		transport: http(providerUrl || process.env.CANNON_PROVIDER_URL || 'http://localhost:8545')
 	}).extend(viem.walletActions) as PublicClient
 }
 
@@ -43,6 +43,6 @@ export function createCannonClient() {
 	return createTestClient({
 		chain: cannonChain,
 		mode: 'anvil',
-		transport: http(process.env.CANNON_TEST_PROVIDER_URL || 'http://localhost:8545')
+		transport: http(process.env.CANNON_PROVIDER_URL || 'http://localhost:8545'), 
 	}).extend(viem.publicActions).extend(viem.walletActions);
 }

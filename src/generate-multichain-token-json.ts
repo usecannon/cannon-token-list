@@ -13,7 +13,7 @@ export async function generateMultichainJSON() {
 	// Make token list multichain (Optimism, arbitrum and polygon)
 	const chainifiedList = await chainify(tokenlist.data);
 
-	await fs.writeFile('tokenlists/multichain-tokenlist.json', JSON.stringify(chainifiedList),  'utf8');
+	await fs.writeFile('./src/tokenlists/multichain-tokenlist.json', JSON.stringify(chainifiedList),  'utf8');
 }
 
 generateMultichainJSON();

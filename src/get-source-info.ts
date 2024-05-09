@@ -19,7 +19,7 @@ function isValidJSON(jsonString: string): boolean {
 // Gets the source code of a contract (and its ABI) if the contract was verified on etherscan
 export async function getSourceCode(chainId: string | number, tokenName: string, tokenAddress: Address) {
 	const dir = path.basename(path.dirname(__dirname));
-	const srcDir = (dir === 'src' ? '.' : 'src');
+	const srcDir = (dir === 'src' ? '.' : './src');
 	const tokenDir = `${tokenName.toLowerCase()}-${chainId}`;
 	const sourcePath = `${srcDir}/sources/${tokenDir}`;
 

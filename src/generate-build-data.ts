@@ -2,13 +2,12 @@ import { ContractArtifact, DeploymentInfo } from "@usecannon/builder";
 import fs from 'fs/promises'
 import * as fss from 'fs'
 import { TokenInfo, TokenList } from "@uniswap/token-lists";
-import { deploySchema } from "@usecannon/builder/dist/schemas";
+import { deploySchema } from "@usecannon/builder/dist/src/schemas";
 import { Abi, Address, Hex } from "viem";
-import { writeIpfs } from "@usecannon/builder/dist/ipfs";
+import { writeIpfs } from "@usecannon/builder/dist/src/ipfs";
 import path from "path";
 import { getSourceCode } from "./get-source-info";
 import { generateLocalBuilds } from "./generate-local-build-data";
-import { registerPackages } from "./register-packages";
 
 export type BridgeInfo = {
 	[destinationChainId: string]: {
@@ -17,7 +16,7 @@ export type BridgeInfo = {
 }
 
 const dir = path.basename(path.dirname(__dirname));
-const srcDir = (dir === 'src' ? '.' : 'src');
+const srcDir = (dir === 'src' ? '.' : './src');
 
 const builtPackages: string[] = [];
 
@@ -63,8 +62,8 @@ async function createDeployInfo(tokenInfo: TokenInfo, chainId: number, address: 
 		.replace('18', tokenInfo.decimals.toString())
 		.replace('TKN', tokenInfo.symbol)
 		.replace(/0x429069B559753E2949745b31fCb34519650455Fc/g, address)
-	transformedSchema = transformedSchema
-		.replace(/mintable-token/g, `${tokenInfo.symbol.toLowerCase()}-token`)
+		.replace(/mintable-token/g, `${tokenInfo.symbol.toLowerCase()}-token`);
+
 	let deployInfo: DeploymentInfo = JSON.parse(transformedSchema);
 
 	deployInfo.generator = 'cannon token generator';
