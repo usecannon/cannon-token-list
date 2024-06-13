@@ -26,7 +26,7 @@ async function getContractSourceInfo(deployInfo: DeploymentInfo, chainId: number
 	// GET CONTRACT SOURCE CODE
 	const [contractName, compilerVersion, sourceCode, ABI, bytecode] = await getSourceCode(chainId, name, address as Address)
 
-	const sourceInfo: ContractArtifact = {
+	const fetchedSourceInfo: ContractArtifact = {
 		sourceName: `src/${contractName || deployInfo.def.name}.sol`,
 		contractName: contractName || deployInfo.def.name,
 		abi: ABI as unknown as Abi,
@@ -39,7 +39,7 @@ async function getContractSourceInfo(deployInfo: DeploymentInfo, chainId: number
 		}
 	}
 
-	return sourceInfo;
+	return fetchedSourceInfo;
 }
 
 async function createDeployInfo(tokenInfo: TokenInfo, chainId: number, address: Address) {
@@ -72,15 +72,15 @@ async function createDeployInfo(tokenInfo: TokenInfo, chainId: number, address: 
 
 	// Transform source code info JSON
 	let sourceSchemaString = JSON.stringify(sourceSchema);
-	let transformedSourceSchema = sourceSchemaString
-		.replace(/MintableToken/g, tokenName)
-
-	let sourceCodeInfo: any = JSON.parse(transformedSourceSchema);
+	let transformedSourceSchema = sourceSchemaString.replace(/MintableToken/g, tokenName);
+	
+	let tokenSource: any = JSON.parse(transformedSourceSchema);
 
 	try {
 		// Schema validation 
 		deploySchema.parse(deployInfo.def.deploy!['Token']);
 	} catch (err) {
+		console.log(err)
 		console.log(`Skipping ${tokenInfo.name}, invalid name`);
 		// Skips building this but writes deploy info locally, these can still be built after schema has been validated
 		await fs.writeFile(`src/deploys/${tokenInfo.name}-deployment.json`, JSON.stringify(deployInfo), 'utf-8')
@@ -89,16 +89,17 @@ async function createDeployInfo(tokenInfo: TokenInfo, chainId: number, address: 
 
 	deployInfo.chainId = chainId;
 
-	return [deployInfo as DeploymentInfo, sourceCodeInfo];
+	return [deployInfo as DeploymentInfo, tokenSource];
 }
 
+// Published token deployment info to ipfs url in settings.json or env var
 async function publishToIpfs(deployInfo: DeploymentInfo, sourceInfo: ContractArtifact, symbol: string, chainId: number) {
 	console.log(`=================== PUSHING TO IPFS =======================`)
 
+	const sourceIpfsHash = await writeIpfs(process.env.IPFS_URL!, sourceInfo, {}, false, 30000, 3);
+	deployInfo.miscUrl = `ipfs://${sourceIpfsHash}`;
+	
 	const deployIpfsHash = await writeIpfs(process.env.IPFS_URL!, deployInfo, {}, false, 30000, 3);
-	const miscIpfsHash = await writeIpfs(process.env.IPFS_URL!, sourceInfo, {}, false, 30000, 3);
-
-	deployInfo.miscUrl = `ipfs://${miscIpfsHash}`;
 
 	const deployTag = `${symbol.toLowerCase()}-token_1.0.0_${chainId}-main.txt`
 	const metaTag = `${symbol.toLowerCase()}-token_1.0.0_${chainId}-main.meta.txt`
@@ -117,36 +118,32 @@ export async function generateBuilds() {
 	for (let tokenInfo of tokenList.tokens) {
 		const tokenName = tokenInfo.name.split(' ').join('');
 
-		const [deployInfo, sourceCodeInfo] = await createDeployInfo(tokenInfo, tokenInfo.chainId, tokenInfo.address as Address);
+		const [deployInfo, tokenSource] = await createDeployInfo(tokenInfo, tokenInfo.chainId, tokenInfo.address as Address);
 
 		if (!deployInfo) {
 			continue;
 		}
 
-		const sourceInfo = await getContractSourceInfo(deployInfo, tokenInfo.chainId, tokenName, tokenInfo.address as Address);
+		const fetchedSourceInfo = await getContractSourceInfo(deployInfo, tokenInfo.chainId, tokenName, tokenInfo.address as Address);
 
-		const [tempAbi, tempSource] = [sourceCodeInfo.artifacts[tokenName].abi, sourceCodeInfo.artifacts[tokenName].source]
+		const [tempAbi, tempSource] = [tokenSource.artifacts[tokenName].abi, tokenSource.artifacts[tokenName].source]
 
 		// If ABI is not from a proxy, we swap it out. Otherwise we keep the mintable token ABI
-		if (sourceInfo.abi && (sourceInfo.abi as any).find((f: any) => f.name === 'balanceOf')) {
-			sourceCodeInfo.artifacts[tokenName].abi = sourceInfo.abi;
-			sourceCodeInfo.artifacts[tokenName].source = sourceInfo.source;
-			sourceCodeInfo.artifacts[tokenName].bytecode = sourceInfo.bytecode;
-			sourceCodeInfo.artifacts[tokenName].sourceName = sourceInfo.sourceName;
-			sourceCodeInfo.artifacts[tokenName].contractName = sourceInfo.contractName;
+		if (fetchedSourceInfo.abi && (fetchedSourceInfo.abi as any).find((f: any) => f.name === 'balanceOf')) {
+			tokenSource.artifacts[tokenName].abi = fetchedSourceInfo.abi;
 
 			// If we are able to retrieve the source info from etherscan, we replace the default ERC20 one with it.
-			deployInfo.state[`deploy.Token`].artifacts.contracts!['Token'].abi = sourceInfo.abi
+			deployInfo.state[`deploy.Token`].artifacts.contracts!['Token'].abi = fetchedSourceInfo.abi
 		} else {
 			console.log("Keeping default ERC20 ABI....")
 		}
 
-		await publishToIpfs(deployInfo, sourceCodeInfo, tokenInfo.symbol, tokenInfo.chainId);
+		await publishToIpfs(deployInfo, tokenSource, tokenInfo.symbol, tokenInfo.chainId);
 
 		builtPackages.push(`${tokenInfo.symbol.toLowerCase()}-token`);
 
 		// Do local build if it hasnt been done already
-		if (fss.existsSync(`${srcDir}/cannondir/tags/${tokenInfo.symbol.toLowerCase()}-token_1_13370-main.txt`)) {
+		if (fss.existsSync(`${srcDir}/cannondir/tags/${tokenInfo.symbol.toLowerCase()}-token_1.0.0_13370-main.txt`)) {
 			console.log("Skipping cannon build.....")
 		} else {
 			// Function to check if constructor has no args
@@ -159,17 +156,17 @@ export async function generateBuilds() {
 				return (constructor.inputs && constructor.inputs.length === 0);
 			}
 
-			if (sourceCodeInfo.artifacts[tokenName].abi && constructorIsEmpty(sourceCodeInfo.artifacts[tokenName].abi)) {
+			if (tokenSource.artifacts[tokenName].abi && constructorIsEmpty(tokenSource.artifacts[tokenName].abi)) {
 				delete deployInfo.def['deploy']['Token'].args;
 				delete deployInfo.def.setting;
 			} else {
-				sourceCodeInfo.artifacts[tokenName].abi = tempAbi;
-				sourceCodeInfo.artifacts[tokenName].source = tempSource;
+				tokenSource.artifacts[tokenName].abi = tempAbi;
+				tokenSource.artifacts[tokenName].source = tempSource;
 			}
 
-			const cannonDeployInfo = await generateLocalBuilds(deployInfo, tokenInfo, sourceCodeInfo);
+			const cannonDeployInfo = await generateLocalBuilds(deployInfo, tokenInfo, tokenSource);
 
-			await publishToIpfs(cannonDeployInfo, sourceCodeInfo, tokenInfo.symbol, 13370)
+			await publishToIpfs(cannonDeployInfo, tokenSource, tokenInfo.symbol, 13370)
 		}
 	}
 

@@ -6,6 +6,7 @@ import { privateKeyToAccount } from 'viem/accounts';
 
 
 const MULTICALL_ADDRESS = '0xE2C5658cC5C448B48141168f3e475dF8f65A1e3e';
+const REGISTRY_PROXY_ADDRESS = '0x8E5C7EFC9636A6A0408A46BB7F617094B81e5dba';
 
 export interface TxData {
   abi: Abi;
@@ -26,11 +27,11 @@ export async function registerPackages(packageOwner: Address) {
   const OPclient = createClient(10, process.env.OP_URL!);
   const Mainnetclient = createClient(1, process.env.MAINNET_URL!);
   const registry = await getCannonContract({
-    package: 'registry:2.13.1@main',
+    package: 'registry:latest@main',
     chainId: 1,
     contractName: 'Proxy',
     storage: new CannonStorage(
-      new OnChainRegistry({ address: '0x8E5C7EFC9636A6A0408A46BB7F617094B81e5dba', provider: OPclient }),
+      new OnChainRegistry({ address: REGISTRY_PROXY_ADDRESS, provider: OPclient }),
       { ipfs: new IPFSLoader(process.env.IPFS_URL!, {}, 30000, 3) })
   });
   // const multicall = await getCannonContract({package: 'trusted-multicall-forwarder', chainId: 1, contractName: 'TrustedMulticallForwarder'});
@@ -47,19 +48,19 @@ export async function registerPackages(packageOwner: Address) {
 
     console.log("CREATING TRANSACTIONS", pkg)
 
-    // txs.push({
-    //   ...registry,
-    //   functionName: 'setPackageOwnership',
-    //   value: registerFee as string,
-    //   args: [packageHash, packageOwner],
-    // });
-
     txs.push({
       ...registry,
-      functionName: 'setAdditionalPublishers',
+      functionName: 'setPackageOwnership',
       value: registerFee as string,
-      args: [packageHash, [], [packageOwner]],
-    })
+      args: [packageHash, packageOwner],
+    });
+
+    // txs.push({
+    //   ...registry,
+    //   functionName: 'setAdditionalPublishers',
+    //   value: registerFee as string,
+    //   args: [packageHash, [], [packageOwner]],
+    // })
   })
 
   console.log(txs)
@@ -88,10 +89,12 @@ export async function registerPackages(packageOwner: Address) {
 
   const account = privateKeyToAccount(process.env.PRIVATE_KEY! as Address);
 
-  const simulatedGas = await Mainnetclient.estimateContractGas({
-    ...txData,
-    account: account
-  } as any);
+  // const simulatedGas = await Mainnetclient.estimateContractGas({
+  //   ...txData,
+  //   account: account
+  // } as any);
+
+  // console.log("SIMULATED GAS", simulatedGas)
 
   const params = {
     ...txData,
@@ -103,7 +106,7 @@ export async function registerPackages(packageOwner: Address) {
 
   console.log(tx);
       
-  const signer = await createWallet(Mainnetclient)
+  const signer = await createWallet(Mainnetclient, process.env.MAINNET_URL as string)
   tx.request.account = account; 
   console.log("Writing to contract")
   const hash = await signer.writeContract(tx.request as any);
