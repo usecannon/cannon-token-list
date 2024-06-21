@@ -3,9 +3,8 @@ import { Address, Abi, zeroAddress, stringToHex, encodeFunctionData, decodeFunct
 import { createClient, createWallet } from "./client";
 import fs from "fs/promises";
 import { privateKeyToAccount } from 'viem/accounts';
+import { debug } from "console";
 
-
-const MULTICALL_ADDRESS = '0xE2C5658cC5C448B48141168f3e475dF8f65A1e3e';
 const REGISTRY_PROXY_ADDRESS = '0x8E5C7EFC9636A6A0408A46BB7F617094B81e5dba';
 
 export interface TxData {
@@ -22,8 +21,6 @@ export async function registerPackages(packageOwner: Address) {
   // Split the data into an array of strings using newline characters as separators
   const packageNames: string[] = packages.split('\n').map(str => str.trim());
 
-  console.log(packageNames)
-
   const OPclient = createClient(10, process.env.OP_URL!);
   const Mainnetclient = createClient(1, process.env.MAINNET_URL!);
   const registry = await getCannonContract({
@@ -31,14 +28,14 @@ export async function registerPackages(packageOwner: Address) {
     chainId: 1,
     contractName: 'Proxy',
     storage: new CannonStorage(
-      new OnChainRegistry({ address: REGISTRY_PROXY_ADDRESS, provider: OPclient }),
+      new OnChainRegistry({ address: REGISTRY_PROXY_ADDRESS, provider: OPclient as any }),
       { ipfs: new IPFSLoader(process.env.IPFS_URL!, {}, 30000, 3) })
   });
   // const multicall = await getCannonContract({package: 'trusted-multicall-forwarder', chainId: 1, contractName: 'TrustedMulticallForwarder'});
 
   let txs: TxData[] = [];
   const registerFee = await Mainnetclient.readContract({ ...registry, functionName: 'registerFee' });
-  const multicallAbi = JSON.parse(await fs.readFile(`./src/multicall.json`, 'utf8'));
+  const registryAbi = JSON.parse(await fs.readFile(`./src/registry.json`, 'utf8'));
 
   packageNames.forEach((pkg) => {
     const packageHash = stringToHex(pkg, { size: 32 });
@@ -63,59 +60,39 @@ export async function registerPackages(packageOwner: Address) {
     // })
   })
 
-  console.log(txs)
-
-  const value = txs.reduce((val, txn) => {
-    return val + (BigInt(txn.value || 0) || BigInt(0));
-  }, BigInt(0));
-
-
-  const txArgs = txs.map((txn) => ({
-    target: txn.address || zeroAddress,
-    callData: encodeFunctionData(txn as any),
-    value: txn.value || '0',
-    requireSuccess: true,
-  }));
-
-  const txData = {
-    abi: multicallAbi,
-    address: MULTICALL_ADDRESS,
-    functionName: 'aggregate3Value',
-    value,
-    args: [
-      txArgs
-    ],
-  };
-
   const account = privateKeyToAccount(process.env.PRIVATE_KEY! as Address);
 
-  // const simulatedGas = await Mainnetclient.estimateContractGas({
-  //   ...txData,
-  //   account: account
-  // } as any);
+  txs.forEach(async (txn) => {
+        
+    const params = {
+      ...txn,
+      account: account,
+    };
 
-  // console.log("SIMULATED GAS", simulatedGas)
-
-  const params = {
-    ...txData,
-    account: account,
-  };
+    const simulatedGas = await Mainnetclient.estimateContractGas(params as any);
   
-  console.log("SIMULATING CONTRACT")
-  const tx = await Mainnetclient.simulateContract(params as any);
-
-  console.log(tx);
-      
-  const signer = await createWallet(Mainnetclient, process.env.MAINNET_URL as string)
-  tx.request.account = account; 
-  console.log("Writing to contract")
-  const hash = await signer.writeContract(tx.request as any);
-  console.log("TX has been written")
+    console.log("SIMULATED GAS", simulatedGas)
   
-  const receipt = await Mainnetclient.waitForTransactionReceipt({ hash });
-  console.log("TX has been waited for")
-
-  console.log(receipt);
+    console.log("Simulating contract transaction")
+    const tx = await Mainnetclient.simulateContract(params as any);
+        
+    const signer = await createWallet(Mainnetclient, process.env.MAINNET_URL as string)
+    tx.request.account = account; 
+    console.log("Writing to contract..")
+    const hash = await signer.writeContract(tx.request as any);
+    console.log("TX has been written")
+    
+    const receipt = await Mainnetclient.waitForTransactionReceipt({ 
+      hash,
+      timeout: 200_000,
+      retryCount: 3, 
+      onReplaced: replacement => console.log(replacement)
+    });
+    console.log("TX has been waited for")
+  
+    debug(receipt);
+    console.log("TRANSACTION STATUS:", receipt.status)
+  }) 
 }
 
 registerPackages('0xca7777aB932E8F0b930dE9F0d96f4E9a2a00DdD3');

@@ -16,23 +16,25 @@ export interface TxData {
 }
 
 export async function publishPackages() {
-  // Read the contents of the file
+  // Clear out published ipfs hash text file
+  await fs.truncate('published-ipfs-hashes.txt', 0)
+  // Read the contents of the deployed packages file
   const packages = await fs.readFile('./src/cannondir/packages', 'utf-8');
   // Split the data into an array of strings using newline characters as separators
   const packageNames: string[] = packages.split('\n').map(str => str.trim());
 
   const chainIds = [
-    // 13370,
-    // 1,
-    // 10,
-    // 56,
-    // 42161,
-    // 42220,
-    // 534352,
-    // 11155111,
-    // 137,
+    13370,
+    1,
+    10,
+    56,
+    42161,
+    42220,
+    534352,
+    11155111,
+    137,
     1101,
-    // 43114
+    43114
   ]
 
   console.log(packageNames)
@@ -43,7 +45,7 @@ export async function publishPackages() {
     chainId: 1,
     contractName: 'Proxy',
     storage: new CannonStorage(
-      new OnChainRegistry({ address: REGISTRY_ADDRESS, provider: OPClient }),
+      new OnChainRegistry({ address: REGISTRY_ADDRESS, provider: OPClient as any }),
       { ipfs: new IPFSLoader(process.env.IPFS_URL!, {}, 30000, 3) })
   });
 
@@ -56,10 +58,10 @@ export async function publishPackages() {
     for (let pkg of packageNames) {
       const packageHash = stringToHex(pkg, { size: 32 });
       const variant = stringToHex(`${chainId}-main`, { size: 32 });
-  
+
       let ipfsHash;
       let ipfsMetaHash;
-  
+
       try {
         ipfsHash = (await fs.readFile(`./src/cannondir/tags/${pkg}_1.0.0_${chainId}-main.txt`)).toString();
         ipfsMetaHash = (await fs.readFile(`./src/cannondir/tags/${pkg}_1.0.0_${chainId}-main.meta.txt`)).toString();
@@ -67,7 +69,7 @@ export async function publishPackages() {
         console.log(`NO DEPLOY FOUND FOR TOKEN ${pkg} AT CHAIN ID ${chainId}`);
         continue;
       }
-  
+
       txs.push({
         ...registry,
         functionName: 'publish',
@@ -80,9 +82,11 @@ export async function publishPackages() {
           ipfsMetaHash || '',
         ],
       });
+
+      // Write published IPFS hashes to file so that we can auto-pin them after
+      await fs.appendFile('published-ipfs-hashes.txt', `${ipfsHash}\n`)
     }
   }
-  console.log(txs)
 
   const value = txs.reduce((val, txn) => {
     return val + (BigInt(txn.value || 0) || BigInt(0));
@@ -113,7 +117,7 @@ export async function publishPackages() {
     account: account,
   };
 
-   const simulatedGas = await OPClient.estimateContractGas({
+  const simulatedGas = await OPClient.estimateContractGas({
     ...txData,
     account: account
   } as any);
@@ -124,7 +128,7 @@ export async function publishPackages() {
   const tx = await OPClient.simulateContract(params as any);
 
   const signer = await createWallet(OPClient, process.env.OP_URL as string)
-  tx.request.account = account; 
+  tx.request.account = account;
   console.log("Writing to contract")
   const hash = await signer.writeContract(tx.request as any);
   console.log("TX has been written")

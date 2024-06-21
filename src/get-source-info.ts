@@ -4,8 +4,20 @@ import axios from 'axios';
 import { createClient } from './client'
 import { Address, Hex } from 'viem';
 import path from 'path';
+import 'dotenv';
 
-type SupportedChain = '1' | '10' | '42161' | '56' | '8543' | '43114';
+type SupportedChain =
+	'1' |
+	'10' |
+	'56' |
+	'137' |
+	'1101' |
+	'8543' |
+	'42161' |
+	'43114' |
+	'42220' |
+	'534352' |
+	'11155111';
 
 function isValidJSON(jsonString: string): boolean {
 	try {
@@ -57,25 +69,31 @@ export async function getSourceCode(chainId: string | number, tokenName: string,
 	}
 
 	const BASE_API_URL = {
-		'10': 'api-optimistic.etherscan.io',
 		'1': 'api.etherscan.io',
+		'10': 'api-optimistic.etherscan.io',
+		'56': 'api.bscscan.com',
+		'137': 'api.polygonscan.com',
+		'1101': 'api-zkevm.polygonscan.com',
+		'8543': 'api.basescan.org',
 		'42161': 'api.arbiscan.io',
-		'56': 'api.polygonscan.com',
+		'42220': 'api.celoscan.io',
 		'43114': 'api.routescan.io/v2/network/mainnet/evm/43114/etherscan',
-		'8543': 'api.basescan.org'
+		'534352': 'api.scrollscan.com',
+		'11155111': 'api-sepolia.etherscan.io',
 	}
 
 	const API_KEYS = {
-		'10': 'TY3XD6VRSN6DHJ4HZKVH2WRTBX86H1957E',
-		'1': 'A7PNIZCEI2HDRUTDJBWS36XBGIB7Q74YMK',
-		'42161': 'DHMV1VJQ2AA6S9Z5I85TS2F9PKFA8W5P71',
-		'56': 'B7TZNYYZ6XVYMIAIGDRC8V49XCZ3QT554Y',
-		'43114': 'A7PNIZCEI2HDRUTDJBWS36XBGIB7Q74YMK',
-		'8543': 'YGI46G5CWBDF3ANP9XXCH4K416XSRBJYVH',
-		'534352': 'A7U4NDZZUUVZ461KMK23WX75FVAATM87KU',
-		'137': 'B7TZNYYZ6XVYMIAIGDRC8V49XCZ3QT554Y',
-		'1101': 'G566P4Y4F9AGPCM7C1U7CNQAU2279BB4EV',
-		'11155111': 'A7PNIZCEI2HDRUTDJBWS36XBGIB7Q74YMK',
+		'1': process.env.ETHERSCAN_APIKEY,
+		'10': process.env.OPTIMISM_APIKEY,
+		'56': process.env.BSC_APIKEY,
+		'137': process.env.POLYGON_APIKEY,
+		'1101': process.env.ZKPOLYGON_APIKEY,
+		'8543': process.env.BASE_APIKEY,
+		'42161': process.env.ARB_APIKEY,
+		'42220': process.env.CELO_APIKEY,
+		'43114': process.env.AVALANCHE_APIKEY,
+		'534352': process.env.SCROLL_APIKEY,
+		'11155111': process.env.SEPOLIA_APIKEY,
 	}
 
 	if (!BASE_API_URL[chainId.toString() as SupportedChain]) {

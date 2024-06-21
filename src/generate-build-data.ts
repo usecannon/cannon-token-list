@@ -8,6 +8,7 @@ import { writeIpfs } from "@usecannon/builder/dist/src/ipfs";
 import path from "path";
 import { getSourceCode } from "./get-source-info";
 import { generateLocalBuilds } from "./generate-local-build-data";
+import { yellow, blue, cyan, green } from 'chalk';
 
 export type BridgeInfo = {
 	[destinationChainId: string]: {
@@ -21,7 +22,7 @@ const srcDir = (dir === 'src' ? '.' : './src');
 const builtPackages: string[] = [];
 
 async function getContractSourceInfo(deployInfo: DeploymentInfo, chainId: number, name: string, address: Address) {
-	console.log(`=================== GETTING CONTRACT SOURCE CODE =======================`)
+	console.log(cyan(`=================================== GETTING CONTRACT SOURCE CODE ===================================`))
 
 	// GET CONTRACT SOURCE CODE
 	const [contractName, compilerVersion, sourceCode, ABI, bytecode] = await getSourceCode(chainId, name, address as Address)
@@ -43,7 +44,7 @@ async function getContractSourceInfo(deployInfo: DeploymentInfo, chainId: number
 }
 
 async function createDeployInfo(tokenInfo: TokenInfo, chainId: number, address: Address) {
-	console.log(`=================== GENERATING BUILD FOR ${tokenInfo.name} AT CHAIN ID ${chainId} =======================`);
+	console.log(green(`==================== GENERATING BUILD: ${tokenInfo.name} AT CHAIN ID ${chainId} ====================`));
 	const tokenName = tokenInfo.name.split(' ').join('');
 
 	if (tokenName.length > 31 || tokenName.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase().length > 31) {
@@ -94,7 +95,7 @@ async function createDeployInfo(tokenInfo: TokenInfo, chainId: number, address: 
 
 // Published token deployment info to ipfs url in settings.json or env var
 async function publishToIpfs(deployInfo: DeploymentInfo, sourceInfo: ContractArtifact, symbol: string, chainId: number) {
-	console.log(`=================== PUSHING TO IPFS =======================`)
+	console.log(blue(`============================== PUSHING ${deployInfo.def.name} TO IPFS ==============================`))
 
 	const sourceIpfsHash = await writeIpfs(process.env.IPFS_URL!, sourceInfo, {}, false, 30000, 3);
 	deployInfo.miscUrl = `ipfs://${sourceIpfsHash}`;
@@ -144,7 +145,7 @@ export async function generateBuilds() {
 
 		// Do local build if it hasnt been done already
 		if (fss.existsSync(`${srcDir}/cannondir/tags/${tokenInfo.symbol.toLowerCase()}-token_1.0.0_13370-main.txt`)) {
-			console.log("Skipping cannon build.....")
+			console.log("Cannon network deployment already exists, Skipping.....")
 		} else {
 			// Function to check if constructor has no args
 			function constructorIsEmpty(abi: any) {
@@ -164,9 +165,13 @@ export async function generateBuilds() {
 				tokenSource.artifacts[tokenName].source = tempSource;
 			}
 
-			const cannonDeployInfo = await generateLocalBuilds(deployInfo, tokenInfo, tokenSource);
-
-			await publishToIpfs(cannonDeployInfo, tokenSource, tokenInfo.symbol, 13370)
+			let cannonDeployInfo; 
+			try {
+				cannonDeployInfo = await generateLocalBuilds(deployInfo, tokenInfo, tokenSource)
+				await publishToIpfs(cannonDeployInfo, tokenSource, tokenInfo.symbol, 13370)
+			} catch (err) {
+				console.log(`Failed to build cannon network package for ${tokenInfo.name}: \n`, err)
+			}
 		}
 	}
 

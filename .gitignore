@@ -6,3 +6,5 @@ src/cannondir/tags/*
 src/cannondir/ipfs_cache/*
 src/deploys/*
 src/tokenlists/*
+.env
+published-ipfs-hashes.txt

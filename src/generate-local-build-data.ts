@@ -47,7 +47,7 @@ export async function generateLocalBuilds(deployInfo: DeploymentInfo, tokenInfo:
 
   const initialCtx = await createInitialContext(chainDefinition, {}, deployInfo.chainId!, deployInfo.options);
 
-	const buildResult = await build(runtime, chainDefinition, deployInfo.state, initialCtx);
+  const buildResult = await build(runtime, chainDefinition, deployInfo.state, initialCtx);
 
   if (cleanSnapshot) {
     await cannonClient.revert({ id: cleanSnapshot });

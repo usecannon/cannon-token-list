@@ -7,7 +7,8 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "generate-multichain-list": "ts-node src/generate-multichain-token-json.ts",
     "generate-builds": "ts-node src/generate-build-data.ts",
-    "publish-packages": "ts-node src/publish-packages.ts"
+    "publish-packages": "ts-node src/publish-packages.ts",
+    "register-packages": "ts-node src/register-packages.ts"
   },
   "author": "",
   "license": "ISC",
@@ -16,12 +17,19 @@
     "@uniswap/default-token-list": "github:uniswap/default-token-list",
     "@uniswap/token-list-bridge-utils": "^2.3.0",
     "@uniswap/token-lists": "^1.0.0-beta.34",
-    "@usecannon/builder": "file:../../cannon/packages/builder",
+    "@usecannon/builder": "^2.15.1",
+    "@usecannon/cli": "^2.15.1",
     "axios": "^1.6.8",
+    "chalk": "^4.1.2",
+    "dotenv": "^16.4.5",
     "node-fetch": "^3.3.2",
+    "prompts": "^2.4.2",
     "ts-node": "^10.9.2",
     "typescript": "^5.4.5",
-    "viem": "^2.13.6",
+    "viem": "^2.15.1",
     "zod": "^3.23.5"
+  },
+  "devDependencies": {
+    "@types/prompts": "^2.4.9"
   }
 }
