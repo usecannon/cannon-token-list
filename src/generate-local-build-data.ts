@@ -2,6 +2,7 @@ import { ChainBuilderRuntime, ChainBuilderRuntimeInfo, ChainDefinition, Contract
 import { createCannonClient } from './client'
 import { PublicClient, WalletClient, Address} from 'viem';
 import { TokenInfo } from "@uniswap/token-lists";
+import 'dotenv/config';
 
 export const CANNON_DIRECTORY='./src/cannondir/';
 

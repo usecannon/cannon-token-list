@@ -9,6 +9,7 @@ import path from "path";
 import { getSourceCode } from "./get-source-info";
 import { generateLocalBuilds } from "./generate-local-build-data";
 import { yellow, blue, cyan, green } from 'chalk';
+import 'dotenv/config';
 
 export type BridgeInfo = {
 	[destinationChainId: string]: {
@@ -48,7 +49,7 @@ async function createDeployInfo(tokenInfo: TokenInfo, chainId: number, address: 
 	const tokenName = tokenInfo.name.split(' ').join('');
 
 	if (tokenName.length > 31 || tokenName.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase().length > 31) {
-		console.log('Package Name too long, skipping....')
+		console.log(yellow('Package Name too long, skipping....'))
 		return [null, null];
 	}
 
@@ -82,7 +83,7 @@ async function createDeployInfo(tokenInfo: TokenInfo, chainId: number, address: 
 		deploySchema.parse(deployInfo.def.deploy!['Token']);
 	} catch (err) {
 		console.log(err)
-		console.log(`Skipping ${tokenInfo.name}, invalid name`);
+		console.log(yellow(`Skipping ${tokenInfo.name}, invalid name`));
 		// Skips building this but writes deploy info locally, these can still be built after schema has been validated
 		await fs.writeFile(`src/deploys/${tokenInfo.name}-deployment.json`, JSON.stringify(deployInfo), 'utf-8')
 		return [null, null];
@@ -145,7 +146,7 @@ export async function generateBuilds() {
 
 		// Do local build if it hasnt been done already
 		if (fss.existsSync(`${srcDir}/cannondir/tags/${tokenInfo.symbol.toLowerCase()}-token_1.0.0_13370-main.txt`)) {
-			console.log("Cannon network deployment already exists, Skipping.....")
+			console.log(yellow("Cannon network deployment already exists, Skipping....."));
 		} else {
 			// Function to check if constructor has no args
 			function constructorIsEmpty(abi: any) {
@@ -170,7 +171,7 @@ export async function generateBuilds() {
 				cannonDeployInfo = await generateLocalBuilds(deployInfo, tokenInfo, tokenSource)
 				await publishToIpfs(cannonDeployInfo, tokenSource, tokenInfo.symbol, 13370)
 			} catch (err) {
-				console.log(`Failed to build cannon network package for ${tokenInfo.name}: \n`, err)
+				console.log(yellow(`Failed to build cannon network package for ${tokenInfo.name}: \n`, err))
 			}
 		}
 	}

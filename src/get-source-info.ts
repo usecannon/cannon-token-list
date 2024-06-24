@@ -4,7 +4,7 @@ import axios from 'axios';
 import { createClient } from './client'
 import { Address, Hex } from 'viem';
 import path from 'path';
-import 'dotenv';
+import 'dotenv/config';
 
 type SupportedChain =
 	'1' |
