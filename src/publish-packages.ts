@@ -5,6 +5,7 @@ import fs from "fs/promises";
 import { privateKeyToAccount } from 'viem/accounts';
 import 'dotenv/config';
 import {yellow} from 'chalk';
+import prompts from 'prompts';
 
 const MULTICALL_ADDRESS = '0xE2C5658cC5C448B48141168f3e475dF8f65A1e3e';
 const REGISTRY_ADDRESS = '0x8E5C7EFC9636A6A0408A46BB7F617094B81e5dba';
@@ -24,6 +25,18 @@ export async function publishPackages() {
   const packages = await fs.readFile('./src/cannondir/packages', 'utf-8');
   // Split the data into an array of strings using newline characters as separators
   const packageNames: string[] = packages.split('\n').map(str => str.trim());
+
+  const confirmation = await prompts({
+    type: 'confirm',
+    name: 'value',
+    message: `This will publish ${packageNames.length} packages, would you like to continue?`,
+    initial: false,
+  });
+
+  if (!confirmation.value) {
+    console.log("Package publishing cancelled.")
+    return;
+  }
 
   const chainIds = [
     13370,
@@ -152,7 +165,7 @@ export async function publishPackages() {
   console.log("Simulating...")
   const tx = await OPClient.simulateContract(params as any);
 
-  const signer = await createWallet(OPClient, process.env.OP_URL as string)
+  const signer = await createWallet(OPClient, process.env.OP_URL as string, account.address)
   tx.request.account = account;
   console.log("Writing to contract")
   const hash = await signer.writeContract(tx.request as any);

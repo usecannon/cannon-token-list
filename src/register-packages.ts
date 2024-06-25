@@ -6,7 +6,7 @@ import { privateKeyToAccount } from 'viem/accounts';
 import { debug } from "console";
 import prompts from "prompts";
 import { formatEther } from 'viem';
-import { blue } from 'chalk';
+import { blue, red, yellow} from 'chalk';
 import 'dotenv/config';
 
 
@@ -62,16 +62,20 @@ export async function registerPackages() {
   for (const pkg of packageNames) {
     const packageHash = stringToHex(pkg, { size: 32 });
 
-    const currentPackageOwner = await Mainnetclient.readContract({ ...registry, functionName: 'getPackageOwner', args: [packageHash] });
+    const currentPackageOwner: string = await Mainnetclient.readContract({ ...registry, functionName: 'getPackageOwner', args: [packageHash] }) as string;
+    const additionalPublishers: string[] = await Mainnetclient.readContract({ ...registry, functionName: 'getAdditionalPublishers', args: [packageHash] }) as string[];
 
-    if (currentPackageOwner != packageOwner) {
+    console.log(additionalPublishers)
+
+    if (currentPackageOwner != packageOwner && currentPackageOwner != zeroAddress) {
       console.log(`The "${pkg}" package has an existing owner at the following address: "${currentPackageOwner}", Skipping...`);
       return;
     }
 
-    console.log("Creating registry transactions for:", pkg)
+    console.log(`========== REGISTERING PACKAGE ${pkg} ==========`)
 
     if (currentPackageOwner == zeroAddress) {
+      console.log(yellow('Current package owner is already set to the signing address, skipping...'))
       txs.push({
         ...registry,
         functionName: 'setPackageOwnership',
@@ -80,6 +84,8 @@ export async function registerPackages() {
       });
     }
 
+    if (additionalPublishers.includes(packageOwner))
+    console.log(yellow('Signing address is already set as an additional publisher, skipping...'))
     txs.push({
       ...registry,
       functionName: 'setAdditionalPublishers',
@@ -88,43 +94,52 @@ export async function registerPackages() {
     })
   }
 
+  const signer = await createWallet(Mainnetclient, process.env.MAINNET_URL as string, account.address);
+
+  let transactionCount = await Mainnetclient.getTransactionCount({
+    address: signer.account!.address,
+  });
+
 
   for (const txn of txs) {
-    const params = {
-      ...txn,
-      account: account,
-    };
+    try {
+      console.log("TX COUNT", transactionCount)
 
-    console.log('Current transaction function: ', txn.functionName)
-    console.log('Current transaction args: ', txn.args)
+      const params = {
+        ...txn,
+        account: account,
+      };
 
-    const simulatedGas = await Mainnetclient.estimateContractGas(params as any);
+      console.log('Current transaction function: ', txn.functionName)
 
-    console.log("Estimated total cost of this tx: ", simulatedGas)
+      const simulatedGas = await Mainnetclient.estimateContractGas(params as any);
 
-    const tx = await Mainnetclient.simulateContract(params as any);
+      console.log("Estimated total cost of this tx: ", simulatedGas)
 
-    const signer = await createWallet(Mainnetclient, process.env.MAINNET_URL as string);
-    tx.request.account = account;
+      const tx = await Mainnetclient.simulateContract(params as any);
+      tx.request.account = account;
+      tx.request.nonce = transactionCount;
 
-    console.log("Writing to contract..");
-    const hash = await signer.writeContract(tx.request as any);
+      console.log("Writing to contract..");
+      const hash = await signer.writeContract(tx.request as any);
 
-    console.log(hash)
+      console.log(`tx with hash "${hash}" has been sent`)
 
-    console.log(`tx with hash "${hash}" has been sent`)
+      const receipt = await Mainnetclient.waitForTransactionReceipt({
+        hash,
+        timeout: 500_000,
+        retryCount: 3,
+        onReplaced: replacement => console.log("Transaction was replaced with: ", replacement)
+      });
+      console.log("TX has been waited for")
 
-    const receipt = await Mainnetclient.waitForTransactionReceipt({
-      hash,
-      timeout: 200_000,
-      retryCount: 3,
-      onReplaced: replacement => console.log("Transaction was replaced with: ", replacement)
-    });
-    console.log("TX has been waited for")
-
-    debug(receipt);
-    console.log("TRANSACTION STATUS:", receipt.status)
+      debug(receipt);
+      console.log("TRANSACTION STATUS:", receipt.status)
+    } catch (err) {
+      console.log(red(`Transaction failed with error:`, err))
+    }
+    transactionCount = transactionCount + 1;
   }
 }
 
-registerPackages();
+  registerPackages();

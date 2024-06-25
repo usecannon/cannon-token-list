@@ -23,7 +23,7 @@ const srcDir = (dir === 'src' ? '.' : './src');
 const builtPackages: string[] = [];
 
 async function getContractSourceInfo(deployInfo: DeploymentInfo, chainId: number, name: string, address: Address) {
-	console.log(cyan(`=================================== GETTING CONTRACT SOURCE CODE ===================================`))
+	console.log(cyan(`Attempting to fetch contract source code for ${deployInfo.def.name}...`))
 
 	// GET CONTRACT SOURCE CODE
 	const [contractName, compilerVersion, sourceCode, ABI, bytecode] = await getSourceCode(chainId, name, address as Address)
@@ -45,7 +45,7 @@ async function getContractSourceInfo(deployInfo: DeploymentInfo, chainId: number
 }
 
 async function createDeployInfo(tokenInfo: TokenInfo, chainId: number, address: Address) {
-	console.log(green(`==================== GENERATING BUILD: ${tokenInfo.name} AT CHAIN ID ${chainId} ====================`));
+	console.log(green(`\n ==================== GENERATING BUILD FOR TOKEN: ${tokenInfo.name} AT CHAIN ID ${chainId} ====================`));
 	const tokenName = tokenInfo.name.split(' ').join('');
 
 	if (tokenName.length > 31 || tokenName.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase().length > 31) {
@@ -96,7 +96,7 @@ async function createDeployInfo(tokenInfo: TokenInfo, chainId: number, address: 
 
 // Published token deployment info to ipfs url in settings.json or env var
 async function publishToIpfs(deployInfo: DeploymentInfo, sourceInfo: ContractArtifact, symbol: string, chainId: number) {
-	console.log(blue(`============================== PUSHING ${deployInfo.def.name} TO IPFS ==============================`))
+	console.log(blue(`Pushing ${deployInfo.def.name} deploy data to ipfs...`))
 
 	const sourceIpfsHash = await writeIpfs(process.env.IPFS_URL!, sourceInfo, {}, false, 30000, 3);
 	deployInfo.miscUrl = `ipfs://${sourceIpfsHash}`;
@@ -137,7 +137,7 @@ export async function generateBuilds() {
 			// If we are able to retrieve the source info from etherscan, we replace the default ERC20 one with it.
 			deployInfo.state[`deploy.Token`].artifacts.contracts!['Token'].abi = fetchedSourceInfo.abi
 		} else {
-			console.log("Keeping default ERC20 ABI....")
+			console.log(yellow("Source code seems to be from a Proxy, Keeping default ERC20 ABI...."))
 		}
 
 		await publishToIpfs(deployInfo, tokenSource, tokenInfo.symbol, tokenInfo.chainId);

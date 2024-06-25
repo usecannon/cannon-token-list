@@ -32,10 +32,11 @@ export function createClient(chainId: number | string, providerUrl?: string) {
 	}).extend(viem.walletActions) as PublicClient
 }
 
-export function createWallet(publicClient: PublicClient, providerUrl: string) {
+export function createWallet(publicClient: PublicClient, providerUrl: string, address: viem.Address) {
 	return createWalletClient({
 		chain: publicClient.chain,
 		transport: http(providerUrl),
+		account: address,
 	});
 }
 

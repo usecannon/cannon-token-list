@@ -5,6 +5,7 @@ import { createClient } from './client'
 import { Address, Hex } from 'viem';
 import path from 'path';
 import 'dotenv/config';
+import { debug } from 'console';
 
 type SupportedChain =
 	'1' |
@@ -114,13 +115,16 @@ export async function getSourceCode(chainId: string | number, tokenName: string,
 			url: etherscanSourceCodeUrl,
 		});
 	} catch (err) {
-		console.log('Error fetching source code, skipping...')
+		console.log('Error fetching source code, skipping...');
+		debug(err);
 		return [sourceCode,
 			compilerVersion,
 			abi,
 			contractName,
 			bytecode,];
 	}
+
+	console.log(response)
 
 	sourceCode = response.data.result[0].sourceCode
 	abi = response.data.result[0].ABI
