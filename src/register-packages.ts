@@ -6,7 +6,7 @@ import { privateKeyToAccount } from 'viem/accounts';
 import { debug } from "console";
 import prompts from "prompts";
 import { formatEther } from 'viem';
-import { blue, red, yellow} from 'chalk';
+import { blue, red, yellow } from 'chalk';
 import 'dotenv/config';
 
 
@@ -24,7 +24,7 @@ export async function registerPackages() {
 
   const account = privateKeyToAccount(process.env.PRIVATE_KEY! as Address);
 
-  const packageOwner = account.address;
+  const packageOwner = '0xf1AF3f6C6386F57156BE2A7BbeddDe68F6Bd7e29';
 
   console.log(blue(`Registering packages with the following address "${packageOwner}"`))
 
@@ -67,15 +67,11 @@ export async function registerPackages() {
 
     console.log(additionalPublishers)
 
-    if (currentPackageOwner != packageOwner && currentPackageOwner != zeroAddress) {
-      console.log(`The "${pkg}" package has an existing owner at the following address: "${currentPackageOwner}", Skipping...`);
-      return;
-    }
-
     console.log(`========== REGISTERING PACKAGE ${pkg} ==========`)
 
-    if (currentPackageOwner == zeroAddress) {
-      console.log(yellow('Current package owner is already set to the signing address, skipping...'))
+    if (currentPackageOwner == packageOwner) {
+      console.log(yellow('Current package owner is already set to the signing address, skipping package ownership registration...'))
+    } else {
       txs.push({
         ...registry,
         functionName: 'setPackageOwnership',
@@ -84,14 +80,16 @@ export async function registerPackages() {
       });
     }
 
-    if (additionalPublishers.includes(packageOwner))
-    console.log(yellow('Signing address is already set as an additional publisher, skipping...'))
-    txs.push({
-      ...registry,
-      functionName: 'setAdditionalPublishers',
-      value: registerFee as string,
-      args: [packageHash, [], [packageOwner]],
-    })
+    if (additionalPublishers.includes(packageOwner)) {
+      console.log(yellow('Signing address is already set as an additional publisher, skipping additional publisher registration...'))
+    } else {
+      txs.push({
+        ...registry,
+        functionName: 'setAdditionalPublishers',
+        value: registerFee as string,
+        args: [packageHash, [], [packageOwner]],
+      })
+    }
   }
 
   const signer = await createWallet(Mainnetclient, process.env.MAINNET_URL as string, account.address);
@@ -142,4 +140,4 @@ export async function registerPackages() {
   }
 }
 
-  registerPackages();
+registerPackages();
