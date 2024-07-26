@@ -1,11 +1,10 @@
 import { CannonStorage, IPFSLoader, OnChainRegistry, getCannonContract } from "@usecannon/builder";
-import { Address, Abi, zeroAddress, stringToHex } from "viem";
+import { Address, Abi, stringToHex } from "viem";
 import { createClient, createWallet } from "./client";
 import fs from "fs/promises";
 import { privateKeyToAccount } from 'viem/accounts';
 import { debug } from "console";
 import prompts from "prompts";
-import { formatEther } from 'viem';
 import { blue, red, yellow } from 'chalk';
 import 'dotenv/config';
 
@@ -24,7 +23,7 @@ export async function registerPackages() {
 
   const account = privateKeyToAccount(process.env.PRIVATE_KEY! as Address);
 
-  const packageOwner = '0xf1AF3f6C6386F57156BE2A7BbeddDe68F6Bd7e29';
+  const packageOwner = account.address;
 
   console.log(blue(`Registering packages with the following address "${packageOwner}"`))
 
